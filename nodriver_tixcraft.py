@@ -759,16 +759,10 @@ async def nodriver_kktix_reg_new_main(tab, config_dict, fail_list, played_sound_
         is_need_refresh = False
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
             # default refresh
             is_need_refresh_final = True
 
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh_tmp = False
                 is_dom_ready, is_ticket_number_assigned, is_need_refresh_tmp = await nodriver_kktix_assign_ticket_number(tab, config_dict, area_keyword_item)
 

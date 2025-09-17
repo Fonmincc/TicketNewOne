@@ -19,6 +19,7 @@ import time
 import warnings
 import webbrowser
 from datetime import datetime
+from pathlib import Path
 
 import chromedriver_autoinstaller_max
 from selenium import webdriver
@@ -85,6 +86,14 @@ CONST_MAXBLOCK_EXTENSION_FILTER =[
 "*treasuredata.com/*",
 "*www.youtube.com/youtubei/v1/player/heartbeat*",
 ]
+
+try:
+    _SCRIPT_DIR = Path(__file__).resolve().parent
+except NameError:
+    _SCRIPT_DIR = Path(util.get_app_root())
+
+MAXBOT_QUESTION_PATH = str(_SCRIPT_DIR / CONST_MAXBOT_QUESTION_FILE)
+MAXBOT_LAST_URL_PATH = str(_SCRIPT_DIR / CONST_MAXBOT_LAST_URL_FILE)
 
 CONST_CHROME_VERSION_NOT_MATCH_EN="Please download the WebDriver version to match your browser version."
 CONST_CHROME_VERSION_NOT_MATCH_TW="請下載與您瀏覽器相同版本的WebDriver版本，或更新您的瀏覽器版本。"
@@ -192,20 +201,17 @@ def get_config_dict(args):
     return config_dict
 
 def write_question_to_file(question_text):
-    working_dir = os.path.dirname(os.path.realpath(__file__))
-    target_path = os.path.join(working_dir, CONST_MAXBOT_QUESTION_FILE)
-    util.write_string_to_file(target_path, question_text)
+    util.write_string_to_file(MAXBOT_QUESTION_PATH, question_text)
 
 def write_last_url_to_file(url):
-    working_dir = os.path.dirname(os.path.realpath(__file__))
-    target_path = os.path.join(working_dir, CONST_MAXBOT_LAST_URL_FILE)
-    util.write_string_to_file(target_path, url)
+    util.write_string_to_file(MAXBOT_LAST_URL_PATH, url)
 
 def read_last_url_from_file():
-    ret = ""
-    with open(CONST_MAXBOT_LAST_URL_FILE, "r") as text_file:
-        ret = text_file.readline()
-    return ret
+    try:
+        with open(MAXBOT_LAST_URL_PATH, "r", encoding="utf-8") as text_file:
+            return text_file.readline().strip()
+    except (FileNotFoundError, OSError):
+        return ""
 
 def get_favoriate_extension_path(webdriver_path, config_dict):
     #print("webdriver_path:", webdriver_path)
@@ -1590,12 +1596,7 @@ def tixcraft_area_auto_select(driver, url, config_dict):
         matched_blocks = None
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh, matched_blocks = get_tixcraft_target_area(el, config_dict, area_keyword_item)
                 if not is_need_refresh:
                     break
@@ -1645,12 +1646,7 @@ def ticketmaster_area_auto_select(driver, config_dict, zone_info):
     matched_blocks = None
 
     if len(area_keyword) > 0:
-        area_keyword_array = []
-        try:
-            area_keyword_array = json.loads("["+ area_keyword +"]")
-        except Exception as exc:
-            area_keyword_array = []
-        for area_keyword_item in area_keyword_array:
+        for area_keyword_item in util.parse_keyword_to_list(area_keyword):
             is_need_refresh, matched_blocks = get_ticketmaster_target_area(config_dict, area_keyword_item, zone_info)
             if not is_need_refresh:
                 break
@@ -2271,12 +2267,7 @@ def get_tixcraft_ticket_select(driver, config_dict):
     form_select = None
     matched_blocks = None
     if len(area_keyword) > 0:
-        area_keyword_array = []
-        try:
-            area_keyword_array = json.loads("["+ area_keyword +"]")
-        except Exception as exc:
-            area_keyword_array = []
-        for area_keyword_item in area_keyword_array:
+        for area_keyword_item in util.parse_keyword_to_list(area_keyword):
             is_need_refresh, matched_blocks = get_tixcraft_ticket_select_by_keyword(driver, config_dict, area_keyword_item)
             if not is_need_refresh:
                 break
@@ -2922,16 +2913,10 @@ def kktix_reg_new_main(driver, config_dict, fail_list, played_sound_ticket):
         is_need_refresh = False
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
             # default refresh
             is_need_refresh_final = True
 
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh_tmp = False
                 is_dom_ready, is_ticket_number_assigned, is_need_refresh_tmp = kktix_assign_ticket_number(driver, config_dict, area_keyword_item)
 
@@ -3608,13 +3593,7 @@ def fami_date_to_area(driver, config_dict, last_activity_url):
     is_need_refresh = False
 
     if len(area_keyword) > 0:
-        area_keyword_array = []
-        try:
-            area_keyword_array = json.loads("["+ area_keyword +"]")
-        except Exception as exc:
-            area_keyword_array = []
-
-        for area_keyword_item in area_keyword_array:
+        for area_keyword_item in util.parse_keyword_to_list(area_keyword):
             is_need_refresh, is_price_assign_by_bot = fami_area_auto_select(driver, config_dict, area_keyword_item)
             if not is_need_refresh:
                 break
@@ -3752,13 +3731,7 @@ def fami_home_auto_select(driver, config_dict, last_activity_url):
 
         area_keyword = config_dict["area_auto_select"]["area_keyword"].strip()
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 matched_blocks = get_fami_target_area(driver, config_dict, area_keyword_item)
                 if not matched_blocks is None:
                     break
@@ -4292,13 +4265,7 @@ def urbtix_performance(driver, config_dict):
         print("area_keyword:", area_keyword)
 
     if len(area_keyword) > 0:
-        area_keyword_array = []
-        try:
-            area_keyword_array = json.loads("["+ area_keyword +"]")
-        except Exception as exc:
-            area_keyword_array = []
-
-        for area_keyword_item in area_keyword_array:
+        for area_keyword_item in util.parse_keyword_to_list(area_keyword):
             if show_debug_message:
                 print("area_keyword_item for keyword:", area_keyword_item)
             is_need_refresh, is_price_assign_by_bot = urbtix_area_auto_select(driver, config_dict, area_keyword_item)
@@ -4762,13 +4729,7 @@ def cityline_performance(driver, config_dict):
             print("area_keyword:", area_keyword)
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh, is_price_assign_by_bot = cityline_area_auto_select(driver, config_dict, area_keyword_item)
                 if not is_need_refresh:
                     break
@@ -5175,13 +5136,7 @@ def ibon_performance(driver, config_dict):
     is_need_refresh = False
 
     if len(area_keyword) > 0:
-        area_keyword_array = []
-        try:
-            area_keyword_array = json.loads("["+ area_keyword +"]")
-        except Exception as exc:
-            area_keyword_array = []
-
-        for area_keyword_item in area_keyword_array:
+        for area_keyword_item in util.parse_keyword_to_list(area_keyword):
             is_need_refresh, is_price_assign_by_bot = ibon_area_auto_select(driver, config_dict, area_keyword_item)
             if not is_need_refresh:
                 break
@@ -7547,14 +7502,11 @@ def hkticketing_date_password_input(driver, config_dict, fail_list):
             is_password_appear = True
             if inputed_value == "":
                 # only this case to auto-fill local dictional value.
-                local_array = []
                 user_guess_string = config_dict["advanced"]["user_guess_string"]
                 if len(user_guess_string) > 0:
-                    user_guess_string = util.format_config_keyword_for_json(user_guess_string)
-                    try:
-                        local_array = json.loads("["+ user_guess_string +"]")
-                    except Exception as exc:
-                        local_array = []
+                    local_array = list(util.parse_keyword_to_list(user_guess_string))
+                else:
+                    local_array = []
                 answer_list = local_array
 
                 inferred_answer_string = ""
@@ -7954,13 +7906,7 @@ def hkticketing_performance(driver, config_dict, domain_name):
             print("area_keyword:", area_keyword)
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh, is_price_assign_by_bot = hkticketing_area_auto_select(driver, config_dict, area_keyword_item)
                 if not is_need_refresh:
                     break
@@ -8856,13 +8802,7 @@ def kham_performance(driver, config_dict, ocr, Captcha_Browser, domain_name, mod
         is_need_refresh = False
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
-            for area_keyword_item in area_keyword_array:
+            for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                 is_need_refresh, is_price_assign_by_bot = kham_area_auto_select(driver, domain_name, config_dict, area_keyword_item)
                 if not is_need_refresh:
                     break
@@ -9897,15 +9837,9 @@ def ticketplus_order_expansion_panel(driver, config_dict, current_layout_style):
         is_need_refresh = False
 
         if len(area_keyword) > 0:
-            area_keyword_array = []
-            try:
-                area_keyword_array = json.loads("["+ area_keyword +"]")
-            except Exception as exc:
-                area_keyword_array = []
-
             is_reset_query = False
             for retry_idx in range(2):
-                for area_keyword_item in area_keyword_array:
+                for area_keyword_item in util.parse_keyword_to_list(area_keyword):
                     is_need_refresh, is_price_assign_by_bot, is_reset_query = ticketplus_order_expansion_auto_select(driver, config_dict, area_keyword_item, current_layout_style)
                     if is_reset_query:
                         break
