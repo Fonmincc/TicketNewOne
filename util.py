@@ -11,9 +11,12 @@ import subprocess
 import sys
 import threading
 import uuid
+from functools import lru_cache
 from typing import Optional
 
 import requests
+
+_IS_WINDOWS = platform.system() == 'Windows'
 
 CONST_FROM_TOP_TO_BOTTOM = "from top to bottom"
 CONST_FROM_BOTTOM_TO_TOP = "from bottom to top"
@@ -140,22 +143,32 @@ def format_config_keyword_for_json(user_input):
             user_input=user_input[:-1]
     return user_input
 
+@lru_cache(maxsize=256)
+def parse_keyword_to_list(keyword_string):
+    if keyword_string is None:
+        return tuple()
+
+    keyword_string = str(keyword_string).strip()
+    if not keyword_string:
+        return tuple()
+
+    formatted_keyword = format_config_keyword_for_json(keyword_string)
+    try:
+        parsed = json.loads(f"[{formatted_keyword}]")
+    except Exception:
+        return tuple()
+
+    if len(parsed) == 1 and isinstance(parsed[0], list):
+        parsed = parsed[0]
+
+    return tuple(item for item in parsed if isinstance(item, str))
+
 def is_text_match_keyword(keyword_string, text):
     is_match_keyword = True
     if len(keyword_string) > 0 and len(text) > 0:
 
-        # directly input text into arrray field.
-        if len(keyword_string) > 0:
-            if not '"' in keyword_string:
-                keyword_string = '"' + keyword_string + '"'
-        
         is_match_keyword = False
-        keyword_array = []
-        try:
-            keyword_array = json.loads("["+ keyword_string +"]")
-        except Exception as exc:
-            keyword_array = []
-        for item_list in keyword_array:
+        for item_list in parse_keyword_to_list(keyword_string):
             if len(item_list) > 0:
                 if ' ' in item_list:
                     keyword_item_array = item_list.split(' ')
@@ -183,14 +196,9 @@ def save_json(config_dict, target_path):
         pass
 
 def write_string_to_file(filename, data):
-    outfile = None
-    if platform.system() == 'Windows':
-        outfile = open(filename, 'w', encoding='UTF-8')
-    else:
-        outfile = open(filename, 'w')
-
-    if not outfile is None:
-        outfile.write("%s" % data)
+    open_kwargs = {'encoding': 'UTF-8'} if _IS_WINDOWS else {}
+    with open(filename, 'w', **open_kwargs) as outfile:
+        outfile.write(f"{data}")
 
 def save_url_to_file(remote_url, CONST_MAXBOT_ANSWER_ONLINE_FILE, force_write = False, timeout=0.5):
     html_text = ""
@@ -316,6 +324,7 @@ def t_or_f(arg):
         ret = True
     return ret
 
+@lru_cache(maxsize=1024)
 def format_keyword_string(keyword):
     if not keyword is None:
         if len(keyword) > 0:
@@ -508,13 +517,8 @@ def dump_settings_to_maxbot_plus_extension(ext, config_dict, CONST_MAXBOT_CONFIG
     local_remote_url_array = []
     local_remote_url = config_dict["advanced"]["remote_url"]
     if len(local_remote_url) > 0:
-        try:
-            temp_remote_url_array = json.loads("["+ local_remote_url +"]")
-            for remote_url in temp_remote_url_array:
-                remote_url_final = remote_url + "*"
-                local_remote_url_array.append(remote_url_final)
-        except Exception as exc:
-            pass
+        for remote_url in parse_keyword_to_list(local_remote_url):
+            local_remote_url_array.append(remote_url + "*")
 
     if len(local_remote_url_array) > 0:
         is_manifest_changed = False
@@ -1314,14 +1318,8 @@ def get_target_item_from_matched_list(matched_blocks, auto_select_mode):
 
 
 def get_matched_blocks_by_keyword(config_dict, auto_select_mode, keyword_string, formated_area_list):
-    keyword_array = []
-    try:
-        keyword_array = json.loads("["+ keyword_string +"]")
-    except Exception as exc:
-        keyword_array = []
-
     matched_blocks = []
-    for keyword_item_set in keyword_array:
+    for keyword_item_set in parse_keyword_to_list(keyword_string):
         matched_blocks = get_matched_blocks_by_keyword_item_set(config_dict, auto_select_mode, keyword_item_set, formated_area_list)
         if len(matched_blocks) > 0:
             break
@@ -1335,12 +1333,7 @@ def is_row_match_keyword(keyword_string, row_text):
     is_match_keyword = True
     if len(keyword_string) > 0 and len(row_text) > 0:
         is_match_keyword = False
-        keyword_array = []
-        try:
-            keyword_array = json.loads("["+ keyword_string +"]")
-        except Exception as exc:
-            keyword_array = []
-        for item_list in keyword_array:
+        for item_list in parse_keyword_to_list(keyword_string):
             if len(item_list) > 0:
                 if ' ' in item_list:
                     keyword_item_array = item_list.split(' ')
@@ -1426,11 +1419,7 @@ def get_answer_list_from_user_guess_string(config_dict, CONST_MAXBOT_ANSWER_ONLI
 
     user_guess_string = config_dict["advanced"]["user_guess_string"]
     if len(user_guess_string) > 0:
-        user_guess_string = format_config_keyword_for_json(user_guess_string)
-        try:
-            local_array = json.loads("["+ user_guess_string +"]")
-        except Exception as exc:
-            local_array = []
+        local_array = list(parse_keyword_to_list(user_guess_string))
 
     # load from internet.
     user_guess_string = ""
@@ -1442,11 +1431,7 @@ def get_answer_list_from_user_guess_string(config_dict, CONST_MAXBOT_ANSWER_ONLI
             pass
 
     if len(user_guess_string) > 0:
-        user_guess_string = format_config_keyword_for_json(user_guess_string)
-        try:
-            online_array = json.loads("["+ user_guess_string +"]")
-        except Exception as exc:
-            online_array = []
+        online_array = list(parse_keyword_to_list(user_guess_string))
 
     return local_array + online_array
 
